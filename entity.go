@@ -84,6 +84,15 @@ func (g *Goon) getStructKey(src interface{}) (*datastore.Key, error) {
 					if stringID == "" {
 						return nil, errors.New("goon: Cannot have a blank Id a String Id object")
 					}
+				case reflect.TypeOf(&datastore.Key{}).Kind():
+					if stringID != "" || intID != 0 {
+						return nil, errors.New("goon: Only one field may be marked id")
+					}
+					key := vf.Interface().(*datastore.Key)
+					if key != nil {
+						setStructKey(src, key)
+						return key, nil
+					}
 				default:
 					return nil, fmt.Errorf("goon: ID field must be int64 or string in %v", t.Name())
 				}
@@ -163,11 +172,13 @@ func setStructKey(src interface{}, key *datastore.Key) error {
 				switch vf.Kind() {
 				case reflect.Int64:
 					vf.SetInt(key.IntID())
-					idSet = true
 				case reflect.String:
 					vf.SetString(key.StringID())
-					idSet = true
+				case reflect.TypeOf(&datastore.Key{}).Kind():
+					vf.Set(reflect.ValueOf(key))
+
 				}
+				idSet = true
 			} else if tagValue == "kind" {
 				if kindSet {
 					return errors.New("goon: Only one field may be marked kind")
