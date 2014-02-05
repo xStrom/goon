@@ -162,7 +162,7 @@ func (g *Goon) RunInTransaction(f func(tg *Goon) error, opts *datastore.Transact
 		g.cacheLock.Lock()
 		defer g.cacheLock.Unlock()
 		for k, v := range ng.toSet {
-			g.cache[k] = v
+			g.putMemoryKey(k, v)
 		}
 
 		for k := range ng.toDelete {
@@ -248,11 +248,22 @@ func (g *Goon) putMemoryMulti(src interface{}) {
 	}
 }
 
+// cache is already locked
+func (g *Goon) putMemoryKey(key string, src interface{}) {
+	if reflect.ValueOf(src).Kind() == reflect.Ptr { // since it's *struct, store a copy instead
+		n := reflect.New(reflect.ValueOf(src).Elem().Type())
+		n.Elem().Set(reflect.ValueOf(src).Elem())
+		g.cache[key] = n.Interface()
+	} else {
+		g.cache[key] = src
+	}
+}
+
 func (g *Goon) putMemory(src interface{}) {
 	key, _, _ := g.getStructKey(src)
 	g.cacheLock.Lock()
 	defer g.cacheLock.Unlock()
-	g.cache[memkey(key)] = src
+	g.putMemoryKey(memkey(key), src)
 }
 
 // FlushLocalCache clears the local memory cache.
@@ -354,6 +365,9 @@ func (g *Goon) GetMulti(dst interface{}) error {
 		m := memkey(key)
 		vi := v.Index(i)
 		if s, present := g.cache[m]; present {
+			if vi.Kind() == reflect.Interface {
+				vi = vi.Elem()
+			}
 			reflect.Indirect(vi).Set(reflect.Indirect(reflect.ValueOf(s)))
 		} else {
 			memkeys = append(memkeys, m)
