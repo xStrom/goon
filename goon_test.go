@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
 	"appengine/memcache"
@@ -49,9 +50,47 @@ const (
 	ivModeTotal
 )
 
+// Have a bunch of different supported types to detect any wild errors
 type ivItem struct {
-	Id   int64  `datastore:"-" goon:"id"`
+	Id        int64       `datastore:"-" goon:"id"`
+	Int       int         `datastore:"int,noindex"`
+	Int8      int8        `datastore:"int8,noindex"`
+	Int16     int16       `datastore:"int16,noindex"`
+	Int32     int32       `datastore:"int32,noindex"`
+	Int64     int64       `datastore:"int64,noindex"`
+	Float32   float32     `datastore:"float32,noindex"`
+	Float64   float64     `datastore:"float64,noindex"`
+	Bool      bool        `datastore:"bool,noindex"`
+	String    string      `datastore:"string,noindex"`
+	ByteSlice []byte      `datastore:"byte_slice,noindex"`
+	Time      time.Time   `datastore:"time,noindex"`
+	TimeSlice []time.Time `datastore:"time_slice,noindex"`
+	NoIndex   int         `datastore:",noindex"`
+	Casual    string
+	Ζεύς      string
+	Key       *datastore.Key
+	ChildKey  *datastore.Key
+	ZeroKey   *datastore.Key
+	KeySlice  []*datastore.Key
+	BlobKey   appengine.BlobKey
+	Sub       ivItemSub
+	Subs      []ivItemSubs
+	ZZZV      []ivZZZV
+}
+
+type ivItemSub struct {
 	Data string `datastore:"data,noindex"`
+	Ints []int  `datastore:"ints,noindex"`
+}
+
+type ivItemSubs struct {
+	Data  string `datastore:"data,noindex"`
+	Extra string `datastore:",noindex"`
+}
+
+type ivZZZV struct {
+	Key  *datastore.Key `datastore:"key,noindex"`
+	Data string         `datastore:"data,noindex"`
 }
 
 func (ivi *ivItem) ForInterface() {}
@@ -60,7 +99,57 @@ type ivItemI interface {
 	ForInterface()
 }
 
-var ivItems = []ivItem{{Id: 1, Data: "one"}, {Id: 2, Data: "two"}, {Id: 3, Data: "three"}}
+var ivItems []ivItem
+
+func initializeIvItems(c appengine.Context) {
+	t1 := time.Now().Truncate(time.Microsecond)
+	t2 := t1.Add(time.Second * 1)
+	t3 := t1.Add(time.Second * 2)
+
+	ivItems = []ivItem{
+		{Id: 1, Int: 123, Int8: 77, Int16: 13001, Int32: 1234567890, Int64: 123456789012345,
+			Float32: (float32(10) / float32(3)), Float64: (float64(10000000) / float64(9998)),
+			Bool: true, String: "one", ByteSlice: []byte{0xDE, 0xAD},
+			Time: t1, TimeSlice: []time.Time{t1, t2, t3}, NoIndex: 1, Casual: "clothes", Ζεύς: "Zeus",
+			Key:      datastore.NewKey(c, "Fruit", "Apple", 0, nil),
+			ChildKey: datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
+			KeySlice: []*datastore.Key{datastore.NewKey(c, "Number", "", 1, nil), nil, datastore.NewKey(c, "Number", "", 2, nil)},
+			BlobKey:  "fake #1",
+			Sub:      ivItemSub{Data: "yay #1", Ints: []int{1, 2, 3}},
+			Subs: []ivItemSubs{
+				{Data: "sub #1.1", Extra: "xtra #1.1"},
+				{Data: "sub #1.2", Extra: "xtra #1.2"},
+				{Data: "sub #1.3", Extra: "xtra #1.3"}},
+			ZZZV: []ivZZZV{{Data: "None"}, {Key: datastore.NewKey(c, "Fruit", "Banana", 0, nil)}}},
+		{Id: 2, Int: 124, Int8: 78, Int16: 13002, Int32: 1234567891, Int64: 123456789012346,
+			Float32: (float32(10) / float32(3)), Float64: (float64(10000000) / float64(9998)),
+			Bool: true, String: "two", ByteSlice: []byte{0xBE, 0xEF},
+			Time: t2, TimeSlice: []time.Time{t2, t3, t1}, NoIndex: 2, Casual: "manners", Ζεύς: "Alcmene",
+			Key:      datastore.NewKey(c, "Fruit", "Banana", 0, nil),
+			ChildKey: datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
+			KeySlice: []*datastore.Key{datastore.NewKey(c, "Number", "", 3, nil), nil, datastore.NewKey(c, "Number", "", 4, nil)},
+			BlobKey:  "fake #2",
+			Sub:      ivItemSub{Data: "yay #2", Ints: []int{4, 5, 6}},
+			Subs: []ivItemSubs{
+				{Data: "sub #2.1", Extra: "xtra #2.1"},
+				{Data: "sub #2.2", Extra: "xtra #2.2"},
+				{Data: "sub #2.3", Extra: "xtra #2.3"}},
+			ZZZV: []ivZZZV{{Data: "None"}, {Key: datastore.NewKey(c, "Fruit", "Banana", 0, nil)}}},
+		{Id: 3, Int: 125, Int8: 79, Int16: 13003, Int32: 1234567892, Int64: 123456789012347,
+			Float32: (float32(10) / float32(3)), Float64: (float64(10000000) / float64(9998)),
+			Bool: true, String: "tri", ByteSlice: []byte{0xF0, 0x0D},
+			Time: t3, TimeSlice: []time.Time{t3, t1, t2}, NoIndex: 3, Casual: "weather", Ζεύς: "Hercules",
+			Key:      datastore.NewKey(c, "Fruit", "Cherry", 0, nil),
+			ChildKey: datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
+			KeySlice: []*datastore.Key{datastore.NewKey(c, "Number", "", 5, nil), nil, datastore.NewKey(c, "Number", "", 6, nil)},
+			BlobKey:  "fake #3",
+			Sub:      ivItemSub{Data: "yay #3", Ints: []int{7, 8, 9}},
+			Subs: []ivItemSubs{
+				{Data: "sub #3.1", Extra: "xtra #3.1"},
+				{Data: "sub #3.2", Extra: "xtra #3.2"},
+				{Data: "sub #3.3", Extra: "xtra #3.3"}},
+			ZZZV: []ivZZZV{{Data: "None"}, {Key: datastore.NewKey(c, "Fruit", "Banana", 0, nil)}}}}
+}
 
 func getInputVarietySrc(t *testing.T, ivType int, indices ...int) interface{} {
 	if ivType >= ivTypeTotal {
@@ -74,37 +163,43 @@ func getInputVarietySrc(t *testing.T, ivType int, indices ...int) interface{} {
 	case ivTypePtrToSliceOfStructs:
 		s := []ivItem{}
 		for _, index := range indices {
-			s = append(s, ivItem{Id: ivItems[index].Id, Data: ivItems[index].Data})
+			ivItemCopy := ivItems[index]
+			s = append(s, ivItemCopy)
 		}
 		result = &s
 	case ivTypePtrToSliceOfPtrsToStruct:
 		s := []*ivItem{}
 		for _, index := range indices {
-			s = append(s, &ivItem{Id: ivItems[index].Id, Data: ivItems[index].Data})
+			ivItemCopy := ivItems[index]
+			s = append(s, &ivItemCopy)
 		}
 		result = &s
 	case ivTypePtrToSliceOfInterfaces:
 		s := []ivItemI{}
 		for _, index := range indices {
-			s = append(s, &ivItem{Id: ivItems[index].Id, Data: ivItems[index].Data})
+			ivItemCopy := ivItems[index]
+			s = append(s, &ivItemCopy)
 		}
 		result = &s
 	case ivTypeSliceOfStructs:
 		s := []ivItem{}
 		for _, index := range indices {
-			s = append(s, ivItem{Id: ivItems[index].Id, Data: ivItems[index].Data})
+			ivItemCopy := ivItems[index]
+			s = append(s, ivItemCopy)
 		}
 		result = s
 	case ivTypeSliceOfPtrsToStruct:
 		s := []*ivItem{}
 		for _, index := range indices {
-			s = append(s, &ivItem{Id: ivItems[index].Id, Data: ivItems[index].Data})
+			ivItemCopy := ivItems[index]
+			s = append(s, &ivItemCopy)
 		}
 		result = s
 	case ivTypeSliceOfInterfaces:
 		s := []ivItemI{}
 		for _, index := range indices {
-			s = append(s, &ivItem{Id: ivItems[index].Id, Data: ivItems[index].Data})
+			ivItemCopy := ivItems[index]
+			s = append(s, &ivItemCopy)
 		}
 		result = s
 	}
@@ -255,11 +350,14 @@ func validateInputVariety(t *testing.T, g *Goon, srcType, dstType, mode int) {
 		t.Errorf("%s > Unexpected error on PutMulti - %v", prettyInfo, err)
 	}
 
+	// Clear the caches, as we're going to precisely set the caches via Get
+	g.FlushLocalCache()
+	memcache.Flush(g.context)
+
 	// Set the caches into proper state based on given mode
 	switch mode {
 	case ivModeDatastore:
-		g.FlushLocalCache()
-		memcache.Flush(g.context)
+		// Caches already clear
 	case ivModeMemcache:
 		loadIVItem(0, 1, 2) // Left in memcache
 		g.FlushLocalCache()
@@ -408,6 +506,8 @@ func TestInputVariety(t *testing.T) {
 	defer c.Close()
 	g := FromContext(c)
 
+	initializeIvItems(c)
+
 	for srcType := 0; srcType < ivTypeTotal; srcType++ {
 		for dstType := 0; dstType < ivTypeTotal; dstType++ {
 			for mode := 0; mode < ivModeTotal; mode++ {
@@ -416,6 +516,204 @@ func TestInputVariety(t *testing.T) {
 				validateInputVarietyTXNGet(t, g, srcType, dstType, mode)
 			}
 		}
+	}
+}
+
+type MigrationA struct {
+	_kind     string            `goon:"kind,Migration"`
+	Id        int64             `datastore:"-" goon:"id"`
+	Number    int32             `datastore:"number,noindex"`
+	Word      string            `datastore:"word,noindex"`
+	Car       string            `datastore:"car,noindex"`
+	Holiday   time.Time         `datastore:"holiday,noindex"`
+	α         int               `datastore:",noindex"`
+	Sub       MigrationSub      `datastore:"sub,noindex"`
+	Son       MigrationPerson   `datastore:"son,noindex"`
+	Daughter  MigrationPerson   `datastore:"daughter,noindex"`
+	Parents   []MigrationPerson `datastore:"parents,noindex"`
+	DeepSlice MigrationDeepA    `datastore:"deep,noindex"`
+	ZZs       []ZigZag          `datastore:"zigzag,noindex"`
+	ZeroKey   *datastore.Key    `datastore:",noindex"`
+}
+
+type MigrationSub struct {
+	Data  string          `datastore:"data,noindex"`
+	Noise []int           `datastore:"noise,noindex"`
+	Sub   MigrationSubSub `datastore:"sub,noindex"`
+}
+
+type MigrationSubSub struct {
+	Data string `datastore:"data,noindex"`
+}
+
+type MigrationPerson struct {
+	Name string `datastore:"name,noindex"`
+	Age  int    `datastore:"age,noindex"`
+}
+
+type MigrationDeepA struct {
+	Deep MigrationDeepB `datastore:"deep,noindex"`
+}
+
+type MigrationDeepB struct {
+	Deep MigrationDeepC `datastore:"deep,noindex"`
+}
+
+type MigrationDeepC struct {
+	Slice []int `datastore:"slice,noindex"`
+}
+
+type ZigZag struct {
+	Zig int `datastore:"zig,noindex"`
+	Zag int `datastore:"zag,noindex"`
+}
+
+type ZigZags struct {
+	Zig []int `datastore:"zig,noindex"`
+	Zag []int `datastore:"zag,noindex"`
+}
+
+type MigrationB struct {
+	_kind          string            `goon:"kind,Migration"`
+	Identification int64             `datastore:"-" goon:"id"`
+	FancyNumber    int32             `datastore:"number,noindex"`
+	Slang          string            `datastore:"word,noindex"`
+	Cars           []string          `datastore:"car,noindex"`
+	Holidays       []time.Time       `datastore:"holiday,noindex"`
+	β              int               `datastore:"α,noindex"`
+	Animal         string            `datastore:"sub.data,noindex"`
+	Music          []int             `datastore:"sub.noise,noindex"`
+	Flower         string            `datastore:"sub.sub.data,noindex"`
+	Sons           []MigrationPerson `datastore:"son,noindex"`
+	DaughterName   string            `datastore:"daughter.name,noindex"`
+	DaughterAge    int               `datastore:"daughter.age,noindex"`
+	OldFolks       []MigrationPerson `datastore:"parents,noindex"`
+	FarSlice       MigrationDeepA    `datastore:"deep,noindex"`
+	ZZs            ZigZags           `datastore:"zigzag,noindex"`
+	Keys           []*datastore.Key  `datastore:"ZeroKey,noindex"`
+}
+
+func TestMigration(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatalf("Could not start aetest - %v", err)
+	}
+	defer c.Close()
+	g := FromContext(c)
+
+	// Create & save an entity with the original structure
+	migA := &MigrationA{Id: 1, Number: 123, Word: "rabbit", Car: "BMW", Holiday: time.Now().Truncate(time.Microsecond), α: 1,
+		Sub: MigrationSub{Data: "fox", Noise: []int{1, 2, 3}, Sub: MigrationSubSub{Data: "rose"}},
+		Son: MigrationPerson{Name: "John", Age: 5}, Daughter: MigrationPerson{Name: "Nancy", Age: 6},
+		Parents:   []MigrationPerson{{Name: "Sven", Age: 56}, {Name: "Sonya", Age: 49}},
+		DeepSlice: MigrationDeepA{Deep: MigrationDeepB{Deep: MigrationDeepC{Slice: []int{1, 2, 3}}}},
+		ZZs:       []ZigZag{{Zig: 1}, {Zag: 1}}}
+	if _, err := g.Put(migA); err != nil {
+		t.Errorf("Unexpected error on Put: %v", err)
+	}
+
+	// Clear the local cache, because we want this data in memcache
+	g.FlushLocalCache()
+
+	// Get it back, so it's in the cache
+	migA = &MigrationA{Id: 1}
+	if err := g.Get(migA); err != nil {
+		t.Errorf("Unexpected error on Get: %v", err)
+	}
+
+	// Clear the local cache, because it doesn't need to support migration
+	g.FlushLocalCache()
+
+	// Test whether memcache supports migration
+	verifyMigration(t, g, migA, "MC")
+
+	// Clear all the caches
+	g.FlushLocalCache()
+	memcache.Flush(c)
+
+	// Test whether datastore supports migration
+	verifyMigration(t, g, migA, "DS")
+}
+
+func verifyMigration(t *testing.T, g *Goon, migA *MigrationA, debugInfo string) {
+	migB := &MigrationB{Identification: migA.Id}
+	if err := g.Get(migB); err != nil {
+		t.Errorf("%v > Unexpected error on Get: %v", debugInfo, err)
+	} else if migA.Id != migB.Identification {
+		t.Errorf("%v > Ids don't match: %v != %v", debugInfo, migA.Id, migB.Identification)
+	} else if migA.Number != migB.FancyNumber {
+		t.Errorf("%v > Numbers don't match: %v != %v", debugInfo, migA.Number, migB.FancyNumber)
+	} else if migA.Word != migB.Slang {
+		t.Errorf("%v > Words don't match: %v != %v", debugInfo, migA.Word, migB.Slang)
+	} else if len(migB.Cars) != 1 {
+		t.Errorf("%v > Expected 1 car! Got: %v", debugInfo, len(migB.Cars))
+	} else if migA.Car != migB.Cars[0] {
+		t.Errorf("%v > Cars don't match: %v != %v", debugInfo, migA.Car, migB.Cars[0])
+	} else if len(migB.Holidays) != 1 {
+		t.Errorf("%v > Expected 1 holiday! Got: %v", debugInfo, len(migB.Holidays))
+	} else if migA.Holiday != migB.Holidays[0] {
+		t.Errorf("%v > Holidays don't match: %v != %v", debugInfo, migA.Holiday, migB.Holidays[0])
+	} else if migA.α != migB.β {
+		t.Errorf("%v > Greek doesn't match: %v != %v", debugInfo, migA.α, migB.β)
+	} else if migA.Sub.Data != migB.Animal {
+		t.Errorf("%v > Animal doesn't match: %v != %v", debugInfo, migA.Sub.Data, migB.Animal)
+	} else if !reflect.DeepEqual(migA.Sub.Noise, migB.Music) {
+		t.Errorf("%v > Music doesn't match: %v != %v", debugInfo, migA.Sub.Noise, migB.Music)
+	} else if migA.Sub.Sub.Data != migB.Flower {
+		t.Errorf("%v > Flower doesn't match: %v != %v", debugInfo, migA.Sub.Sub.Data, migB.Flower)
+	} else if len(migB.Sons) != 1 {
+		t.Errorf("%v > Expected 1 son! Got: %v", debugInfo, len(migB.Sons))
+	} else if migA.Son.Name != migB.Sons[0].Name {
+		t.Errorf("%v > Son names don't match: %v != %v", debugInfo, migA.Son.Name, migB.Sons[0].Name)
+	} else if migA.Son.Age != migB.Sons[0].Age {
+		t.Errorf("%v > Son ages don't match: %v != %v", debugInfo, migA.Son.Age, migB.Sons[0].Age)
+	} else if migA.Daughter.Name != migB.DaughterName {
+		t.Errorf("%v > Daughter names don't match: %v != %v", debugInfo, migA.Daughter.Name, migB.DaughterName)
+	} else if migA.Daughter.Age != migB.DaughterAge {
+		t.Errorf("%v > Daughter ages don't match: %v != %v", debugInfo, migA.Daughter.Age, migB.DaughterAge)
+	} else if !reflect.DeepEqual(migA.Parents, migB.OldFolks) {
+		t.Errorf("%v > Parents don't match: %v != %v", debugInfo, migA.Parents, migB.OldFolks)
+	} else if !reflect.DeepEqual(migA.DeepSlice, migB.FarSlice) {
+		t.Errorf("%v > Deep slice doesn't match: %v != %v", debugInfo, migA.DeepSlice, migB.FarSlice)
+	} else if len(migB.ZZs.Zig) != 2 {
+		t.Errorf("%v > Expected 2 Zigs, got: %v", debugInfo, len(migB.ZZs.Zig))
+	} else if len(migB.ZZs.Zag) != 2 {
+		t.Errorf("%v > Expected 2 Zags, got: %v", debugInfo, len(migB.ZZs.Zag))
+	} else if migA.ZZs[0].Zig != migB.ZZs.Zig[0] {
+		t.Errorf("%v > Invalid zig #1: %v != %v", debugInfo, migA.ZZs[0].Zig, migB.ZZs.Zig[0])
+	} else if migA.ZZs[1].Zig != migB.ZZs.Zig[1] {
+		t.Errorf("%v > Invalid zig #2: %v != %v", debugInfo, migA.ZZs[1].Zig, migB.ZZs.Zig[1])
+	} else if migA.ZZs[0].Zag != migB.ZZs.Zag[0] {
+		t.Errorf("%v > Invalid zag #1: %v != %v", debugInfo, migA.ZZs[0].Zag, migB.ZZs.Zag[0])
+	} else if migA.ZZs[1].Zag != migB.ZZs.Zag[1] {
+		t.Errorf("%v > Invalid zag #2: %v != %v", debugInfo, migA.ZZs[1].Zag, migB.ZZs.Zag[1])
+	} else if len(migB.Keys) != 1 {
+		t.Errorf("%v > Expected 1 keys, got %v", debugInfo, len(migB.Keys))
+	}
+}
+
+func TestNegativeCacheHit(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatalf("Could not start aetest - %v", err)
+	}
+	defer c.Close()
+	g := FromContext(c)
+
+	hid := &HasId{Id: 1}
+
+	if err := g.Get(hid); err != datastore.ErrNoSuchEntity {
+		t.Errorf("Expected ErrNoSuchEntity, got %v", err)
+	}
+
+	// Do a sneaky save straight to the datastore
+	if _, err := datastore.Put(c, datastore.NewKey(c, "HasId", "", 1, nil), &HasId{Id: 1, Name: "one"}); err != nil {
+		t.Errorf("Unexpected error on datastore.Put: %v", err)
+	}
+
+	// Get the entity again via goon, to make sure we cached the non-existance
+	if err := g.Get(hid); err != datastore.ErrNoSuchEntity {
+		t.Errorf("Expected ErrNoSuchEntity, got %v", err)
 	}
 }
 
@@ -780,7 +1078,7 @@ func TestGoon(t *testing.T) {
 	}
 
 	hiPush := &HasId{Id: hi.Id, Name: "changedinmemcache"}
-	n.putMemcache([]interface{}{hiPush})
+	n.putMemcache([]interface{}{hiPush}, []byte{1})
 	n.cacheLock.Lock()
 	delete(n.cache, memkey(n.Key(hi)))
 	n.cacheLock.Unlock()
@@ -1333,13 +1631,13 @@ func TestGoon(t *testing.T) {
 		for _, fetchType := range []string{"memory", "memcache", "datastore"} {
 			switch fetchType {
 			case "datastore":
-				err = memcache.Delete(c, n.Key(gt.orig).Encode())
+				err = memcache.Delete(c, memkey(n.Key(gt.orig)))
 				if err != nil {
-					t.Fatalf("Error clearing memcache for %#v", gt.orig)
+					t.Fatalf("Error clearing memcache for %#v - %v", gt.orig, err)
 				}
 				fallthrough
 			case "memcache":
-				n.cache = make(map[string]interface{})
+				n.FlushLocalCache()
 			}
 
 			putDest := reflect.New(reflect.TypeOf(gt.orig).Elem()).Interface().(GoonStore)
@@ -1628,4 +1926,77 @@ type GoonStore interface {
 type GoonTest struct {
 	orig   GoonStore
 	putErr bool
+}
+
+func TestMultis(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatalf("Could not start aetest - %v", err)
+	}
+	defer c.Close()
+	n := FromContext(c)
+
+	testAmounts := []int{1, 999, 1000, 1001, 1999, 2000, 2001, 2510}
+	for _, x := range testAmounts {
+		memcache.Flush(c)
+		objects := make([]*HasId, x)
+		for y := 0; y < x; y++ {
+			objects[y] = &HasId{Id: int64(y + 1)}
+		}
+		if _, err := n.PutMulti(objects); err != nil {
+			t.Fatalf("Error in PutMulti for %d objects - %v", x, err)
+		}
+		n.FlushLocalCache() // Put just put them in the local cache, get rid of it before doing the Get
+		if err := n.GetMulti(objects); err != nil {
+			t.Fatalf("Error in GetMulti - %v", err)
+		}
+	}
+
+	// do it again, but only write numbers divisible by 100
+	for _, x := range testAmounts {
+		memcache.Flush(c)
+		getobjects := make([]*HasId, 0, x)
+		putobjects := make([]*HasId, 0, x/100+1)
+		keys := make([]*datastore.Key, x)
+		for y := 0; y < x; y++ {
+			keys[y] = datastore.NewKey(c, "HasId", "", int64(y+1), nil)
+		}
+		if err := n.DeleteMulti(keys); err != nil {
+			t.Fatalf("Error deleting keys - %v", err)
+		}
+		for y := 0; y < x; y++ {
+			getobjects = append(getobjects, &HasId{Id: int64(y + 1)})
+			if y%100 == 0 {
+				putobjects = append(putobjects, &HasId{Id: int64(y + 1)})
+			}
+		}
+
+		_, err := n.PutMulti(putobjects)
+		if err != nil {
+			t.Fatalf("Error in PutMulti for %d objects - %v", x, err)
+		}
+		n.FlushLocalCache() // Put just put them in the local cache, get rid of it before doing the Get
+		err = n.GetMulti(getobjects)
+		if err == nil && x != 1 { // a test size of 1 has no objects divisible by 100, so there's no cache miss to return
+			t.Errorf("Should be receiving a multiError on %d objects, but got no errors", x)
+			continue
+		}
+
+		merr, ok := err.(appengine.MultiError)
+		if ok {
+			if len(merr) != len(getobjects) {
+				t.Errorf("Should have received a MultiError object of length %d but got length %d instead", len(getobjects), len(merr))
+			}
+			for x := range merr {
+				switch { // record good conditions, fail in other conditions
+				case merr[x] == nil && x%100 == 0:
+				case merr[x] != nil && x%100 != 0:
+				default:
+					t.Errorf("Found bad condition on object[%d] and error %v", x+1, merr[x])
+				}
+			}
+		} else if x != 1 {
+			t.Errorf("Did not return a multierror on fetch but when fetching %d objects, received - %v", x, merr)
+		}
+	}
 }
