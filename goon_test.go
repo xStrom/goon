@@ -51,31 +51,84 @@ const (
 )
 
 // Have a bunch of different supported types to detect any wild errors
+// https://developers.google.com/appengine/docs/go/datastore/reference
 type ivItem struct {
-	Id        int64       `datastore:"-" goon:"id"`
-	Int       int         `datastore:"int,noindex"`
-	Int8      int8        `datastore:"int8,noindex"`
-	Int16     int16       `datastore:"int16,noindex"`
-	Int32     int32       `datastore:"int32,noindex"`
-	Int64     int64       `datastore:"int64,noindex"`
-	Float32   float32     `datastore:"float32,noindex"`
-	Float64   float64     `datastore:"float64,noindex"`
-	Bool      bool        `datastore:"bool,noindex"`
-	String    string      `datastore:"string,noindex"`
-	ByteSlice []byte      `datastore:"byte_slice,noindex"`
-	Time      time.Time   `datastore:"time,noindex"`
-	TimeSlice []time.Time `datastore:"time_slice,noindex"`
-	NoIndex   int         `datastore:",noindex"`
-	Casual    string
-	Ζεύς      string
-	Key       *datastore.Key
-	ChildKey  *datastore.Key
-	ZeroKey   *datastore.Key
-	KeySlice  []*datastore.Key
-	BlobKey   appengine.BlobKey
-	Sub       ivItemSub
-	Subs      []ivItemSubs
-	ZZZV      []ivZZZV
+	Id          int64        `datastore:"-" goon:"id"`
+	Int         int          `datastore:"int,noindex"`
+	Int8        int8         `datastore:"int8,noindex"`
+	Int16       int16        `datastore:"int16,noindex"`
+	Int32       int32        `datastore:"int32,noindex"`
+	Int64       int64        `datastore:"int64,noindex"`
+	Float32     float32      `datastore:"float32,noindex"`
+	Float64     float64      `datastore:"float64,noindex"`
+	Bool        bool         `datastore:"bool,noindex"`
+	String      string       `datastore:"string,noindex"`
+	CustomTypes ivItemCustom `datastore:"custom,noindex"`
+	SliceTypes  ivItemSlice  `datastore:"slice,noindex"`
+	ByteSlice   []byte       `datastore:"byte_slice,noindex"`
+	BSSlice     [][]byte     `datastore:"bs_slice,noindex"`
+	Time        time.Time    `datastore:"time,noindex"`
+	TimeSlice   []time.Time  `datastore:"time_slice,noindex"`
+	NoIndex     int          `datastore:",noindex"`
+	Casual      string
+	Ζεύς        string
+	Key         *datastore.Key
+	ChildKey    *datastore.Key
+	ZeroKey     *datastore.Key
+	KeySlice    []*datastore.Key
+	KeySliceNil []*datastore.Key
+	BlobKey     appengine.BlobKey
+	BKSlice     []appengine.BlobKey
+	Sub         ivItemSub
+	Subs        []ivItemSubs
+	ZZZV        []ivZZZV
+}
+
+type ivItemInt int
+type ivItemInt8 int8
+type ivItemInt16 int16
+type ivItemInt32 int32
+type ivItemInt64 int64
+type ivItemFloat32 float32
+type ivItemFloat64 float64
+type ivItemBool bool
+type ivItemString string
+
+type ivItemDeepInt ivItemInt
+
+type ivItemCustom struct {
+	Int     ivItemInt
+	Int8    ivItemInt8
+	Int16   ivItemInt16
+	Int32   ivItemInt32
+	Int64   ivItemInt64
+	Float32 ivItemFloat32
+	Float64 ivItemFloat64
+	Bool    ivItemBool
+	String  ivItemString
+	DeepInt ivItemDeepInt
+}
+
+type ivItemSlice struct {
+	Int      []int
+	Int8     []int8
+	Int16    []int16
+	Int32    []int32
+	Int64    []int64
+	Float32  []float32
+	Float64  []float64
+	Bool     []bool
+	String   []string
+	IntC     []ivItemInt
+	Int8C    []ivItemInt8
+	Int16C   []ivItemInt16
+	Int32C   []ivItemInt32
+	Int64C   []ivItemInt64
+	Float32C []ivItemFloat32
+	Float64C []ivItemFloat64
+	BoolC    []ivItemBool
+	StringC  []ivItemString
+	DeepInt  []ivItemDeepInt
 }
 
 type ivItemSub struct {
@@ -109,13 +162,24 @@ func initializeIvItems(c appengine.Context) {
 	ivItems = []ivItem{
 		{Id: 1, Int: 123, Int8: 77, Int16: 13001, Int32: 1234567890, Int64: 123456789012345,
 			Float32: (float32(10) / float32(3)), Float64: (float64(10000000) / float64(9998)),
-			Bool: true, String: "one", ByteSlice: []byte{0xDE, 0xAD},
-			Time: t1, TimeSlice: []time.Time{t1, t2, t3}, NoIndex: 1, Casual: "clothes", Ζεύς: "Zeus",
-			Key:      datastore.NewKey(c, "Fruit", "Apple", 0, nil),
-			ChildKey: datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
-			KeySlice: []*datastore.Key{datastore.NewKey(c, "Number", "", 1, nil), nil, datastore.NewKey(c, "Number", "", 2, nil)},
-			BlobKey:  "fake #1",
-			Sub:      ivItemSub{Data: "yay #1", Ints: []int{1, 2, 3}},
+			Bool: true, String: "one",
+			CustomTypes: ivItemCustom{Int: 123, Int8: 77, Int16: 13001, Int32: 1234567890, Int64: 123456789012345,
+				Float32: ivItemFloat32(float32(10) / float32(3)), Float64: ivItemFloat64(float64(10000000) / float64(9998)),
+				Bool: true, String: "one", DeepInt: 1},
+			SliceTypes: ivItemSlice{Int: []int{1, 2}, Int8: []int8{1, 2}, Int16: []int16{1, 2}, Int32: []int32{1, 2}, Int64: []int64{1, 2},
+				Float32: []float32{1.0, 2.0}, Float64: []float64{1.0, 2.0}, Bool: []bool{true, false}, String: []string{"one", "two"},
+				IntC: []ivItemInt{1, 2}, Int8C: []ivItemInt8{1, 2}, Int16C: []ivItemInt16{1, 2}, Int32C: []ivItemInt32{1, 2}, Int64C: []ivItemInt64{1, 2},
+				Float32C: []ivItemFloat32{1.0, 2.0}, Float64C: []ivItemFloat64{1.0, 2.0},
+				BoolC: []ivItemBool{true, false}, StringC: []ivItemString{"one", "two"}, DeepInt: []ivItemDeepInt{1, 2}},
+			ByteSlice: []byte{0xDE, 0xAD}, BSSlice: [][]byte{{0x01, 0x02}, {0x03, 0x04}},
+			Time: t1, TimeSlice: []time.Time{t1, t2, t3}, NoIndex: 1,
+			Casual: "clothes", Ζεύς: "Zeus",
+			Key:         datastore.NewKey(c, "Fruit", "Apple", 0, nil),
+			ChildKey:    datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
+			KeySlice:    []*datastore.Key{datastore.NewKey(c, "Key", "", 1, nil), datastore.NewKey(c, "Key", "", 2, nil), datastore.NewKey(c, "Key", "", 3, nil)},
+			KeySliceNil: []*datastore.Key{datastore.NewKey(c, "Number", "", 1, nil), nil, datastore.NewKey(c, "Number", "", 2, nil)},
+			BlobKey:     "fake #1", BKSlice: []appengine.BlobKey{"fake #1.1", "fake #1.2"},
+			Sub: ivItemSub{Data: "yay #1", Ints: []int{1, 2, 3}},
 			Subs: []ivItemSubs{
 				{Data: "sub #1.1", Extra: "xtra #1.1"},
 				{Data: "sub #1.2", Extra: "xtra #1.2"},
@@ -123,13 +187,24 @@ func initializeIvItems(c appengine.Context) {
 			ZZZV: []ivZZZV{{Data: "None"}, {Key: datastore.NewKey(c, "Fruit", "Banana", 0, nil)}}},
 		{Id: 2, Int: 124, Int8: 78, Int16: 13002, Int32: 1234567891, Int64: 123456789012346,
 			Float32: (float32(10) / float32(3)), Float64: (float64(10000000) / float64(9998)),
-			Bool: true, String: "two", ByteSlice: []byte{0xBE, 0xEF},
-			Time: t2, TimeSlice: []time.Time{t2, t3, t1}, NoIndex: 2, Casual: "manners", Ζεύς: "Alcmene",
-			Key:      datastore.NewKey(c, "Fruit", "Banana", 0, nil),
-			ChildKey: datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
-			KeySlice: []*datastore.Key{datastore.NewKey(c, "Number", "", 3, nil), nil, datastore.NewKey(c, "Number", "", 4, nil)},
-			BlobKey:  "fake #2",
-			Sub:      ivItemSub{Data: "yay #2", Ints: []int{4, 5, 6}},
+			Bool: true, String: "two",
+			CustomTypes: ivItemCustom{Int: 124, Int8: 78, Int16: 13002, Int32: 1234567891, Int64: 123456789012346,
+				Float32: ivItemFloat32(float32(10) / float32(3)), Float64: ivItemFloat64(float64(10000000) / float64(9998)),
+				Bool: true, String: "two", DeepInt: 2},
+			SliceTypes: ivItemSlice{Int: []int{1, 2}, Int8: []int8{1, 2}, Int16: []int16{1, 2}, Int32: []int32{1, 2}, Int64: []int64{1, 2},
+				Float32: []float32{1.0, 2.0}, Float64: []float64{1.0, 2.0}, Bool: []bool{true, false}, String: []string{"one", "two"},
+				IntC: []ivItemInt{1, 2}, Int8C: []ivItemInt8{1, 2}, Int16C: []ivItemInt16{1, 2}, Int32C: []ivItemInt32{1, 2}, Int64C: []ivItemInt64{1, 2},
+				Float32C: []ivItemFloat32{1.0, 2.0}, Float64C: []ivItemFloat64{1.0, 2.0},
+				BoolC: []ivItemBool{true, false}, StringC: []ivItemString{"one", "two"}, DeepInt: []ivItemDeepInt{1, 2}},
+			ByteSlice: []byte{0xBE, 0xEF}, BSSlice: [][]byte{{0x05, 0x06}, {0x07, 0x08}},
+			Time: t2, TimeSlice: []time.Time{t2, t3, t1}, NoIndex: 2,
+			Casual: "manners", Ζεύς: "Alcmene",
+			Key:         datastore.NewKey(c, "Fruit", "Banana", 0, nil),
+			ChildKey:    datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
+			KeySlice:    []*datastore.Key{datastore.NewKey(c, "Key", "", 4, nil), datastore.NewKey(c, "Key", "", 5, nil), datastore.NewKey(c, "Key", "", 6, nil)},
+			KeySliceNil: []*datastore.Key{datastore.NewKey(c, "Number", "", 3, nil), nil, datastore.NewKey(c, "Number", "", 4, nil)},
+			BlobKey:     "fake #2", BKSlice: []appengine.BlobKey{"fake #2.1", "fake #2.2"},
+			Sub: ivItemSub{Data: "yay #2", Ints: []int{4, 5, 6}},
 			Subs: []ivItemSubs{
 				{Data: "sub #2.1", Extra: "xtra #2.1"},
 				{Data: "sub #2.2", Extra: "xtra #2.2"},
@@ -137,13 +212,24 @@ func initializeIvItems(c appengine.Context) {
 			ZZZV: []ivZZZV{{Data: "None"}, {Key: datastore.NewKey(c, "Fruit", "Banana", 0, nil)}}},
 		{Id: 3, Int: 125, Int8: 79, Int16: 13003, Int32: 1234567892, Int64: 123456789012347,
 			Float32: (float32(10) / float32(3)), Float64: (float64(10000000) / float64(9998)),
-			Bool: true, String: "tri", ByteSlice: []byte{0xF0, 0x0D},
-			Time: t3, TimeSlice: []time.Time{t3, t1, t2}, NoIndex: 3, Casual: "weather", Ζεύς: "Hercules",
-			Key:      datastore.NewKey(c, "Fruit", "Cherry", 0, nil),
-			ChildKey: datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
-			KeySlice: []*datastore.Key{datastore.NewKey(c, "Number", "", 5, nil), nil, datastore.NewKey(c, "Number", "", 6, nil)},
-			BlobKey:  "fake #3",
-			Sub:      ivItemSub{Data: "yay #3", Ints: []int{7, 8, 9}},
+			Bool: true, String: "tri",
+			CustomTypes: ivItemCustom{Int: 125, Int8: 79, Int16: 13003, Int32: 1234567892, Int64: 123456789012347,
+				Float32: ivItemFloat32(float32(10) / float32(3)), Float64: ivItemFloat64(float64(10000000) / float64(9998)),
+				Bool: true, String: "tri", DeepInt: 3},
+			SliceTypes: ivItemSlice{Int: []int{1, 2}, Int8: []int8{1, 2}, Int16: []int16{1, 2}, Int32: []int32{1, 2}, Int64: []int64{1, 2},
+				Float32: []float32{1.0, 2.0}, Float64: []float64{1.0, 2.0}, Bool: []bool{true, false}, String: []string{"one", "two"},
+				IntC: []ivItemInt{1, 2}, Int8C: []ivItemInt8{1, 2}, Int16C: []ivItemInt16{1, 2}, Int32C: []ivItemInt32{1, 2}, Int64C: []ivItemInt64{1, 2},
+				Float32C: []ivItemFloat32{1.0, 2.0}, Float64C: []ivItemFloat64{1.0, 2.0},
+				BoolC: []ivItemBool{true, false}, StringC: []ivItemString{"one", "two"}, DeepInt: []ivItemDeepInt{1, 2}},
+			ByteSlice: []byte{0xF0, 0x0D}, BSSlice: [][]byte{{0x09, 0x0A}, {0x0B, 0x0C}},
+			Time: t3, TimeSlice: []time.Time{t3, t1, t2}, NoIndex: 3,
+			Casual: "weather", Ζεύς: "Hercules",
+			Key:         datastore.NewKey(c, "Fruit", "Cherry", 0, nil),
+			ChildKey:    datastore.NewKey(c, "Person", "Jane", 0, datastore.NewKey(c, "Person", "John", 0, datastore.NewKey(c, "Person", "Jack", 0, nil))),
+			KeySlice:    []*datastore.Key{datastore.NewKey(c, "Key", "", 7, nil), datastore.NewKey(c, "Key", "", 8, nil), datastore.NewKey(c, "Key", "", 9, nil)},
+			KeySliceNil: []*datastore.Key{datastore.NewKey(c, "Number", "", 5, nil), nil, datastore.NewKey(c, "Number", "", 6, nil)},
+			BlobKey:     "fake #3", BKSlice: []appengine.BlobKey{"fake #3.1", "fake #3.2"},
+			Sub: ivItemSub{Data: "yay #3", Ints: []int{7, 8, 9}},
 			Subs: []ivItemSubs{
 				{Data: "sub #3.1", Extra: "xtra #3.1"},
 				{Data: "sub #3.2", Extra: "xtra #3.2"},
@@ -151,7 +237,170 @@ func initializeIvItems(c appengine.Context) {
 			ZZZV: []ivZZZV{{Data: "None"}, {Key: datastore.NewKey(c, "Fruit", "Banana", 0, nil)}}}}
 }
 
-func getInputVarietySrc(t *testing.T, ivType int, indices ...int) interface{} {
+func getIVItemCopy(g *Goon, index int) *ivItem {
+	// All basic value types are copied easily
+	ivi := ivItems[index]
+
+	// .. but pointer based types require extra work
+	ivi.SliceTypes.Int = []int{}
+	for _, v := range ivItems[index].SliceTypes.Int {
+		ivi.SliceTypes.Int = append(ivi.SliceTypes.Int, v)
+	}
+
+	ivi.SliceTypes.Int8 = []int8{}
+	for _, v := range ivItems[index].SliceTypes.Int8 {
+		ivi.SliceTypes.Int8 = append(ivi.SliceTypes.Int8, v)
+	}
+
+	ivi.SliceTypes.Int16 = []int16{}
+	for _, v := range ivItems[index].SliceTypes.Int16 {
+		ivi.SliceTypes.Int16 = append(ivi.SliceTypes.Int16, v)
+	}
+
+	ivi.SliceTypes.Int32 = []int32{}
+	for _, v := range ivItems[index].SliceTypes.Int32 {
+		ivi.SliceTypes.Int32 = append(ivi.SliceTypes.Int32, v)
+	}
+
+	ivi.SliceTypes.Int64 = []int64{}
+	for _, v := range ivItems[index].SliceTypes.Int64 {
+		ivi.SliceTypes.Int64 = append(ivi.SliceTypes.Int64, v)
+	}
+
+	ivi.SliceTypes.Float32 = []float32{}
+	for _, v := range ivItems[index].SliceTypes.Float32 {
+		ivi.SliceTypes.Float32 = append(ivi.SliceTypes.Float32, v)
+	}
+
+	ivi.SliceTypes.Float64 = []float64{}
+	for _, v := range ivItems[index].SliceTypes.Float64 {
+		ivi.SliceTypes.Float64 = append(ivi.SliceTypes.Float64, v)
+	}
+
+	ivi.SliceTypes.Bool = []bool{}
+	for _, v := range ivItems[index].SliceTypes.Bool {
+		ivi.SliceTypes.Bool = append(ivi.SliceTypes.Bool, v)
+	}
+
+	ivi.SliceTypes.String = []string{}
+	for _, v := range ivItems[index].SliceTypes.String {
+		ivi.SliceTypes.String = append(ivi.SliceTypes.String, v)
+	}
+
+	ivi.SliceTypes.IntC = []ivItemInt{}
+	for _, v := range ivItems[index].SliceTypes.IntC {
+		ivi.SliceTypes.IntC = append(ivi.SliceTypes.IntC, v)
+	}
+
+	ivi.SliceTypes.Int8C = []ivItemInt8{}
+	for _, v := range ivItems[index].SliceTypes.Int8C {
+		ivi.SliceTypes.Int8C = append(ivi.SliceTypes.Int8C, v)
+	}
+
+	ivi.SliceTypes.Int16C = []ivItemInt16{}
+	for _, v := range ivItems[index].SliceTypes.Int16C {
+		ivi.SliceTypes.Int16C = append(ivi.SliceTypes.Int16C, v)
+	}
+
+	ivi.SliceTypes.Int32C = []ivItemInt32{}
+	for _, v := range ivItems[index].SliceTypes.Int32C {
+		ivi.SliceTypes.Int32C = append(ivi.SliceTypes.Int32C, v)
+	}
+
+	ivi.SliceTypes.Int64C = []ivItemInt64{}
+	for _, v := range ivItems[index].SliceTypes.Int64C {
+		ivi.SliceTypes.Int64C = append(ivi.SliceTypes.Int64C, v)
+	}
+
+	ivi.SliceTypes.Float32C = []ivItemFloat32{}
+	for _, v := range ivItems[index].SliceTypes.Float32C {
+		ivi.SliceTypes.Float32C = append(ivi.SliceTypes.Float32C, v)
+	}
+
+	ivi.SliceTypes.Float64C = []ivItemFloat64{}
+	for _, v := range ivItems[index].SliceTypes.Float64C {
+		ivi.SliceTypes.Float64C = append(ivi.SliceTypes.Float64C, v)
+	}
+
+	ivi.SliceTypes.BoolC = []ivItemBool{}
+	for _, v := range ivItems[index].SliceTypes.BoolC {
+		ivi.SliceTypes.BoolC = append(ivi.SliceTypes.BoolC, v)
+	}
+
+	ivi.SliceTypes.StringC = []ivItemString{}
+	for _, v := range ivItems[index].SliceTypes.StringC {
+		ivi.SliceTypes.StringC = append(ivi.SliceTypes.StringC, v)
+	}
+
+	ivi.SliceTypes.DeepInt = []ivItemDeepInt{}
+	for _, v := range ivItems[index].SliceTypes.DeepInt {
+		ivi.SliceTypes.DeepInt = append(ivi.SliceTypes.DeepInt, v)
+	}
+
+	ivi.ByteSlice = []byte{}
+	for _, v := range ivItems[index].ByteSlice {
+		ivi.ByteSlice = append(ivi.ByteSlice, v)
+	}
+
+	ivi.BSSlice = [][]byte{}
+	for _, v := range ivItems[index].BSSlice {
+		vCopy := []byte{}
+		for _, v := range v {
+			vCopy = append(vCopy, v)
+		}
+		ivi.BSSlice = append(ivi.BSSlice, vCopy)
+	}
+
+	ivi.TimeSlice = []time.Time{}
+	for _, v := range ivItems[index].TimeSlice {
+		ivi.TimeSlice = append(ivi.TimeSlice, v)
+	}
+
+	ivi.Key = datastore.NewKey(g.context, ivItems[index].Key.Kind(), ivItems[index].Key.StringID(), ivItems[index].Key.IntID(), nil)
+
+	ivi.ChildKey = datastore.NewKey(g.context, ivItems[index].ChildKey.Kind(), ivItems[index].ChildKey.StringID(), ivItems[index].ChildKey.IntID(),
+		datastore.NewKey(g.context, ivItems[index].ChildKey.Parent().Kind(), ivItems[index].ChildKey.Parent().StringID(), ivItems[index].ChildKey.Parent().IntID(),
+			datastore.NewKey(g.context, ivItems[index].ChildKey.Parent().Parent().Kind(), ivItems[index].ChildKey.Parent().Parent().StringID(), ivItems[index].ChildKey.Parent().Parent().IntID(), nil)))
+
+	ivi.KeySlice = []*datastore.Key{}
+	for _, key := range ivItems[index].KeySlice {
+		ivi.KeySlice = append(ivi.KeySlice, datastore.NewKey(g.context, key.Kind(), key.StringID(), key.IntID(), nil))
+	}
+
+	ivi.KeySliceNil = []*datastore.Key{}
+	for _, key := range ivItems[index].KeySliceNil {
+		if key == nil {
+			ivi.KeySliceNil = append(ivi.KeySliceNil, nil)
+		} else {
+			ivi.KeySliceNil = append(ivi.KeySliceNil, datastore.NewKey(g.context, key.Kind(), key.StringID(), key.IntID(), nil))
+		}
+	}
+
+	ivi.BKSlice = []appengine.BlobKey{}
+	for _, v := range ivItems[index].BKSlice {
+		ivi.BKSlice = append(ivi.BKSlice, v)
+	}
+
+	ivi.Sub = ivItemSub{}
+	ivi.Sub.Data = ivItems[index].Sub.Data
+	for _, v := range ivItems[index].Sub.Ints {
+		ivi.Sub.Ints = append(ivi.Sub.Ints, v)
+	}
+
+	ivi.Subs = []ivItemSubs{}
+	for _, sub := range ivItems[index].Subs {
+		ivi.Subs = append(ivi.Subs, ivItemSubs{Data: sub.Data, Extra: sub.Extra})
+	}
+
+	ivi.ZZZV = []ivZZZV{}
+	for _, zzzv := range ivItems[index].ZZZV {
+		ivi.ZZZV = append(ivi.ZZZV, ivZZZV{Key: zzzv.Key, Data: zzzv.Data})
+	}
+
+	return &ivi
+}
+
+func getInputVarietySrc(t *testing.T, g *Goon, ivType int, indices ...int) interface{} {
 	if ivType >= ivTypeTotal {
 		t.Fatalf("Invalid input variety type! %v >= %v", ivType, ivTypeTotal)
 		return nil
@@ -163,43 +412,37 @@ func getInputVarietySrc(t *testing.T, ivType int, indices ...int) interface{} {
 	case ivTypePtrToSliceOfStructs:
 		s := []ivItem{}
 		for _, index := range indices {
-			ivItemCopy := ivItems[index]
-			s = append(s, ivItemCopy)
+			s = append(s, *getIVItemCopy(g, index))
 		}
 		result = &s
 	case ivTypePtrToSliceOfPtrsToStruct:
 		s := []*ivItem{}
 		for _, index := range indices {
-			ivItemCopy := ivItems[index]
-			s = append(s, &ivItemCopy)
+			s = append(s, getIVItemCopy(g, index))
 		}
 		result = &s
 	case ivTypePtrToSliceOfInterfaces:
 		s := []ivItemI{}
 		for _, index := range indices {
-			ivItemCopy := ivItems[index]
-			s = append(s, &ivItemCopy)
+			s = append(s, getIVItemCopy(g, index))
 		}
 		result = &s
 	case ivTypeSliceOfStructs:
 		s := []ivItem{}
 		for _, index := range indices {
-			ivItemCopy := ivItems[index]
-			s = append(s, ivItemCopy)
+			s = append(s, *getIVItemCopy(g, index))
 		}
 		result = s
 	case ivTypeSliceOfPtrsToStruct:
 		s := []*ivItem{}
 		for _, index := range indices {
-			ivItemCopy := ivItems[index]
-			s = append(s, &ivItemCopy)
+			s = append(s, getIVItemCopy(g, index))
 		}
 		result = s
 	case ivTypeSliceOfInterfaces:
 		s := []ivItemI{}
 		for _, index := range indices {
-			ivItemCopy := ivItems[index]
-			s = append(s, &ivItemCopy)
+			s = append(s, getIVItemCopy(g, index))
 		}
 		result = s
 	}
@@ -341,8 +584,8 @@ func validateInputVariety(t *testing.T, g *Goon, srcType, dstType, mode int) {
 	ivWipe(t, g, prettyInfo)
 
 	// Generate test data with the specified types
-	src := getInputVarietySrc(t, srcType, 0, 1, 2)
-	ref := getInputVarietySrc(t, dstType, 0, 1, 2)
+	src := getInputVarietySrc(t, g, srcType, 0, 1, 2)
+	ref := getInputVarietySrc(t, g, dstType, 0, 1, 2)
 	dst := getInputVarietyDst(t, dstType)
 
 	// Save our test data
@@ -407,8 +650,8 @@ func validateInputVarietyTXNPut(t *testing.T, g *Goon, srcType, dstType, mode in
 	ivWipe(t, g, prettyInfo)
 
 	// Generate test data with the specified types
-	src := getInputVarietySrc(t, srcType, 0, 1, 2)
-	ref := getInputVarietySrc(t, dstType, 0, 1, 2)
+	src := getInputVarietySrc(t, g, srcType, 0, 1, 2)
+	ref := getInputVarietySrc(t, g, dstType, 0, 1, 2)
 	dst := getInputVarietyDst(t, dstType)
 
 	// Save our test data
@@ -430,7 +673,7 @@ func validateInputVarietyTXNPut(t *testing.T, g *Goon, srcType, dstType, mode in
 		g.FlushLocalCache()
 		memcache.Flush(g.context)
 
-		subSrc := getInputVarietySrc(t, srcType, 0)
+		subSrc := getInputVarietySrc(t, g, srcType, 0)
 
 		if err := g.RunInTransaction(func(tg *Goon) error {
 			_, err := tg.PutMulti(subSrc)
@@ -473,8 +716,8 @@ func validateInputVarietyTXNGet(t *testing.T, g *Goon, srcType, dstType, mode in
 	ivWipe(t, g, prettyInfo)
 
 	// Generate test data with the specified types
-	src := getInputVarietySrc(t, srcType, 0, 1, 2)
-	ref := getInputVarietySrc(t, dstType, 0, 1, 2)
+	src := getInputVarietySrc(t, g, srcType, 0, 1, 2)
+	ref := getInputVarietySrc(t, g, dstType, 0, 1, 2)
 	dst := getInputVarietyDst(t, dstType)
 
 	// Save our test data
@@ -527,6 +770,8 @@ type MigrationA struct {
 	Car       string            `datastore:"car,noindex"`
 	Holiday   time.Time         `datastore:"holiday,noindex"`
 	α         int               `datastore:",noindex"`
+	Level     MigrationIntA     `datastore:"level,noindex`
+	Floor     MigrationIntA     `datastore:"floor,noindex"`
 	Sub       MigrationSub      `datastore:"sub,noindex"`
 	Son       MigrationPerson   `datastore:"son,noindex"`
 	Daughter  MigrationPerson   `datastore:"daughter,noindex"`
@@ -534,6 +779,7 @@ type MigrationA struct {
 	DeepSlice MigrationDeepA    `datastore:"deep,noindex"`
 	ZZs       []ZigZag          `datastore:"zigzag,noindex"`
 	ZeroKey   *datastore.Key    `datastore:",noindex"`
+	File      []byte
 }
 
 type MigrationSub struct {
@@ -573,6 +819,9 @@ type ZigZags struct {
 	Zag []int `datastore:"zag,noindex"`
 }
 
+type MigrationIntA int
+type MigrationIntB int
+
 type MigrationB struct {
 	_kind          string            `goon:"kind,Migration"`
 	Identification int64             `datastore:"-" goon:"id"`
@@ -581,6 +830,8 @@ type MigrationB struct {
 	Cars           []string          `datastore:"car,noindex"`
 	Holidays       []time.Time       `datastore:"holiday,noindex"`
 	β              int               `datastore:"α,noindex"`
+	Level          MigrationIntB     `datastore:"level,noindex`
+	Floors         []MigrationIntB   `datastore:"floor,noindex"`
 	Animal         string            `datastore:"sub.data,noindex"`
 	Music          []int             `datastore:"sub.noise,noindex"`
 	Flower         string            `datastore:"sub.sub.data,noindex"`
@@ -591,6 +842,7 @@ type MigrationB struct {
 	FarSlice       MigrationDeepA    `datastore:"deep,noindex"`
 	ZZs            ZigZags           `datastore:"zigzag,noindex"`
 	Keys           []*datastore.Key  `datastore:"ZeroKey,noindex"`
+	Files          [][]byte          `datastore:"File,noindex"`
 }
 
 func TestMigration(t *testing.T) {
@@ -602,12 +854,13 @@ func TestMigration(t *testing.T) {
 	g := FromContext(c)
 
 	// Create & save an entity with the original structure
-	migA := &MigrationA{Id: 1, Number: 123, Word: "rabbit", Car: "BMW", Holiday: time.Now().Truncate(time.Microsecond), α: 1,
+	migA := &MigrationA{Id: 1, Number: 123, Word: "rabbit", Car: "BMW",
+		Holiday: time.Now().Truncate(time.Microsecond), α: 1, Level: 9001, Floor: 5,
 		Sub: MigrationSub{Data: "fox", Noise: []int{1, 2, 3}, Sub: MigrationSubSub{Data: "rose"}},
 		Son: MigrationPerson{Name: "John", Age: 5}, Daughter: MigrationPerson{Name: "Nancy", Age: 6},
 		Parents:   []MigrationPerson{{Name: "Sven", Age: 56}, {Name: "Sonya", Age: 49}},
 		DeepSlice: MigrationDeepA{Deep: MigrationDeepB{Deep: MigrationDeepC{Slice: []int{1, 2, 3}}}},
-		ZZs:       []ZigZag{{Zig: 1}, {Zag: 1}}}
+		ZZs:       []ZigZag{{Zig: 1}, {Zag: 1}}, File: []byte{0xF0, 0x0D}}
 	if _, err := g.Put(migA); err != nil {
 		t.Errorf("Unexpected error on Put: %v", err)
 	}
@@ -655,6 +908,12 @@ func verifyMigration(t *testing.T, g *Goon, migA *MigrationA, debugInfo string) 
 		t.Errorf("%v > Holidays don't match: %v != %v", debugInfo, migA.Holiday, migB.Holidays[0])
 	} else if migA.α != migB.β {
 		t.Errorf("%v > Greek doesn't match: %v != %v", debugInfo, migA.α, migB.β)
+	} else if int(migA.Level) != int(migB.Level) {
+		t.Errorf("%v > Level doesn't match: %v != %v", debugInfo, migA.Level, migB.Level)
+	} else if len(migB.Floors) != 1 {
+		t.Errorf("%v > Expected 1 floor! Got: %v", debugInfo, len(migB.Floors))
+	} else if int(migA.Floor) != int(migB.Floors[0]) {
+		t.Errorf("%v > Floor doesn't match: %v != %v", debugInfo, migA.Floor, migB.Floors[0])
 	} else if migA.Sub.Data != migB.Animal {
 		t.Errorf("%v > Animal doesn't match: %v != %v", debugInfo, migA.Sub.Data, migB.Animal)
 	} else if !reflect.DeepEqual(migA.Sub.Noise, migB.Music) {
@@ -689,6 +948,10 @@ func verifyMigration(t *testing.T, g *Goon, migA *MigrationA, debugInfo string) 
 		t.Errorf("%v > Invalid zag #2: %v != %v", debugInfo, migA.ZZs[1].Zag, migB.ZZs.Zag[1])
 	} else if len(migB.Keys) != 1 {
 		t.Errorf("%v > Expected 1 keys, got %v", debugInfo, len(migB.Keys))
+	} else if len(migB.Files) != 1 {
+		t.Errorf("%v > Expected 1 file, got %v", debugInfo, len(migB.Files))
+	} else if !reflect.DeepEqual(migA.File, migB.Files[0]) {
+		t.Errorf("%v > Files don't match: %v != %v", debugInfo, migA.File, migB.Files[0])
 	}
 }
 

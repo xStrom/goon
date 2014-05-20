@@ -66,7 +66,7 @@ func (g *Goon) C() appengine.Context {
 
 func memkey(k *datastore.Key) string {
 	// Versioning, so that incompatible changes to the cache system won't cause problems
-	return "g1:" + k.Encode()
+	return "g2:" + k.Encode()
 }
 
 // NewGoon creates a new Goon object from the given request.
