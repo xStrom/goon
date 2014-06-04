@@ -17,6 +17,11 @@
 package goon
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
@@ -1877,4 +1882,476 @@ func TestMultis(t *testing.T) {
 			t.Errorf("Did not return a multierror on fetch but when fetching %d objects, received - %v", x, merr)
 		}
 	}
+}
+
+const (
+	NAFace      Face  = iota
+	Ace         Face  = iota
+	Ten         Face  = iota
+	King        Face  = iota
+	Queen       Face  = iota
+	Jack        Face  = iota
+	Nine        Face  = iota
+	acearound   uint8 = 10
+	kingaround  uint8 = 8
+	queenaround uint8 = 6
+	jackaround  uint8 = 4
+	debugLog          = false
+	AllCards    int8  = 24
+)
+
+const (
+	NASuit   Suit = iota
+	Spades   Suit = iota
+	Hearts   Suit = iota
+	Clubs    Suit = iota
+	Diamonds Suit = iota
+)
+
+const (
+	NACard Card = iota
+	AS     Card = iota
+	TS     Card = iota
+	KS     Card = iota
+	QS     Card = iota
+	JS     Card = iota
+	NS     Card = iota
+	AH     Card = iota
+	TH     Card = iota
+	KH     Card = iota
+	QH     Card = iota
+	JH     Card = iota
+	NH     Card = iota
+	AC     Card = iota
+	TC     Card = iota
+	KC     Card = iota
+	QC     Card = iota
+	JC     Card = iota
+	NC     Card = iota
+	AD     Card = iota
+	TD     Card = iota
+	KD     Card = iota
+	QD     Card = iota
+	JD     Card = iota
+	ND     Card = iota
+)
+
+var Faces [6]Face
+var Suits [4]Suit
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+	Faces = [6]Face{Ace, Ten, King, Queen, Jack, Nine}
+	Suits = [4]Suit{Spades, Hearts, Clubs, Diamonds}
+}
+
+type Card int8 // an integer representation of the card
+type Suit int8
+type Face int8
+
+type Deck [24]Card
+type Hand []Card
+
+func (c Card) GetBitInfo() (bitnum uint, sliceIndex int8) {
+	bitnum = uint((c-1)%4) * 2
+	sliceIndex = int8((c - 1) / 4)
+	return
+}
+
+func CreateCard(suit Suit, face Face) Card {
+	return Card((int(suit-1) * 6) + int(face))
+}
+
+func (c Card) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.String())
+}
+
+func (s *Suit) UnmarshalJSON(data []byte) error {
+	var str string
+	err := json.Unmarshal(data, &str)
+	if err != nil {
+		return err
+	}
+	if len(str) != 1 {
+		return errors.New(fmt.Sprintf("Data %s not a suit", data))
+	}
+	suit := NASuit
+	switch str[0] {
+	case 'D':
+		suit = Diamonds
+	case 'S':
+		suit = Spades
+	case 'H':
+		suit = Hearts
+	case 'C':
+		suit = Clubs
+	default:
+		return errors.New(fmt.Sprintf("Data %s not a suit", data))
+	}
+	*s = Suit(suit)
+	return nil
+}
+
+func (c *Card) UnmarshalJSON(data []byte) error {
+	var str string
+	err := json.Unmarshal(data, &str)
+	if err != nil {
+		return err
+	}
+	if len(str) != 2 {
+		return errors.New(fmt.Sprintf("Data %s not a card", data))
+	}
+	face := NAFace
+	switch str[0] {
+	case 'A':
+		face = Ace
+	case 'T':
+		face = Ten
+	case 'K':
+		face = King
+	case 'Q':
+		face = Queen
+	case 'J':
+		face = Jack
+	case '9':
+		face = Nine
+	default:
+		return errors.New(fmt.Sprintf("Data %s not a card", data))
+	}
+	suit := NASuit
+	switch str[1] {
+	case 'D':
+		suit = Diamonds
+	case 'S':
+		suit = Spades
+	case 'H':
+		suit = Hearts
+	case 'C':
+		suit = Clubs
+	default:
+		return errors.New(fmt.Sprintf("Data %s not a card", data))
+	}
+	*c = Card(int(suit-1)*6 + int(face))
+	return nil
+}
+
+func (c Card) String() string {
+	if c == NACard {
+		return "NA"
+	}
+	return c.Face().String() + c.Suit().String()
+}
+
+func (a Card) Beats(b Card, trump Suit) bool {
+	// a is the challenging card
+	if b == NACard {
+		return true
+	}
+	switch {
+	case a.Suit() == b.Suit():
+		return a < b
+	case a.Suit() == trump:
+		return true
+	}
+	return false
+}
+
+func (c Card) Counter() bool {
+	return c.Face() == Ace || c.Face() == Ten || c.Face() == King
+}
+
+func (c Card) Suit() Suit {
+	if c == NACard {
+		return NASuit
+	}
+	return Suit((c-1)/6 + 1)
+}
+
+func (c Card) Face() Face {
+	if c == NACard {
+		return NAFace
+	}
+	return Face((c-1)%6 + 1)
+}
+
+func (d *Deck) Swap(i, j uint8) {
+	d[i], d[j] = d[j], d[i]
+}
+
+func (d *Deck) Shuffle() {
+	//	http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm
+	for i := len(d) - 1; i >= 1; i-- {
+		if j := rand.Intn(i); i != j {
+			d.Swap(uint8(i), uint8(j))
+		}
+	}
+}
+
+func (h Hand) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("Hand{")
+	for x := range h {
+		buffer.WriteString(h[x].String())
+		buffer.WriteString(", ")
+	}
+	buffer.WriteString("}")
+	return buffer.String()
+}
+
+func (h Hand) Len() int {
+	return len(h)
+}
+
+func (h Hand) Less(i, j int) bool {
+	if h[i].Suit() == h[j].Suit() {
+		return h[i].Face().Less(h[j].Face())
+	}
+	return h[i].Suit().Less(h[j].Suit())
+}
+
+func (a Face) Less(b Face) bool {
+	return a < b
+}
+
+func (s Suit) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func (a Suit) String() string {
+	switch a {
+	case NASuit:
+		return "~"
+	case Diamonds:
+		return "D"
+	case Spades:
+		return "S"
+	case Hearts:
+		return "H"
+	case Clubs:
+		return "C"
+	}
+	panic(fmt.Sprintf("Error finding suit for %d", a))
+}
+
+func (a Face) String() string {
+	switch a {
+	case Nine:
+		return "9"
+	case Jack:
+		return "J"
+	case Queen:
+		return "Q"
+	case King:
+		return "K"
+	case Ten:
+		return "T"
+	case Ace:
+		return "A"
+	}
+	panic(fmt.Sprintf("Error finding face for %d", int(a)))
+}
+
+func (a Suit) Less(b Suit) bool { // only for sorting the suits for display in the hand
+	return a > b
+}
+
+func (h Hand) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+}
+
+func (h *Hand) Shuffle() {
+	//	http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm
+	for i := len(*h) - 1; i >= 1; i-- {
+		if j := rand.Intn(i); i != j {
+			h.Swap(i, j)
+		}
+	}
+}
+
+func (d Deck) Deal() (hands []Hand) {
+	hands = make([]Hand, 4)
+	for x := 0; x < 4; x++ {
+		hands[x] = make([]Card, 12)
+	}
+	for y := 0; y < 12; y++ {
+		for x := 0; x < 4; x++ {
+			hands[x][y] = d[y*4+x]
+		}
+	}
+	return
+}
+
+func CreateDeck() (deck Deck) {
+	index := 0
+	for x := AS; int8(x) <= AllCards; x++ {
+		deck[index] = x
+		index++
+	}
+	return
+}
+
+type Trick struct {
+	Played        [4]Card
+	WinningPlayer uint8
+	Lead          uint8
+	Plays         uint8
+	Next          uint8 // the next player that needs to play
+}
+
+func (t *Trick) PlayCard(card Card, trump Suit) {
+	if t.Plays == 4 {
+		t.reset()
+	}
+	t.Played[t.Next] = card
+	if t.Plays == 0 {
+		t.Lead = t.Next
+		t.WinningPlayer = t.Next
+	} else if card.Beats(t.Played[t.WinningPlayer], trump) {
+		t.WinningPlayer = t.Next
+	}
+	t.Plays++
+	t.Next = (t.Next + 1) % uint8(len(t.Played))
+	if t.Plays == 4 {
+		t.Next = t.WinningPlayer
+	}
+	//Log(4, "After trick.PlayCard - %s", t)
+	//Log(4, "After trick.PlayCard - %#v", t)
+}
+
+func (t *Trick) reset() {
+	t.Plays = 0
+}
+
+func (t *Trick) String() string {
+	if t == nil {
+		return ""
+	}
+	var str bytes.Buffer
+	str.WriteString("-")
+	if t.Plays == 0 {
+		return "-----"
+	}
+	var printme [4]bool
+	walker := t.Lead - 1
+	for x := uint8(0); x < t.Plays; x++ {
+		walker = (walker + 1) % 4
+		printme[walker] = true
+	}
+	for y := uint8(0); y < 4; y++ {
+		if printme[y] {
+			if t.Lead == y {
+				str.WriteString("l")
+			}
+			if t.WinningPlayer == y {
+				str.WriteString("w")
+			}
+			str.WriteString(fmt.Sprintf("%s-", t.Played[y]))
+		} else {
+			str.WriteString("-")
+		}
+	}
+	return str.String()
+}
+
+func (trick *Trick) leadSuit() Suit {
+	if trick.Plays == 0 {
+		return NASuit
+	}
+	return trick.Played[trick.Lead].Suit()
+}
+
+func (trick *Trick) winningCard() Card {
+	if trick.Plays == 0 {
+		return NACard
+	}
+	return trick.Played[trick.WinningPlayer]
+}
+
+func (trick *Trick) counters() (counters uint8) {
+	if trick.Plays != 4 {
+		panic("can't get counters before the trick is finished")
+	}
+	for _, card := range trick.Played {
+		if card.Counter() {
+			counters++
+		}
+	}
+	return
+}
+
+func TestSerialization(t *testing.T) {
+	var decks [4][24]Card
+	for x := range decks {
+		decks[x] = CreateDeck()
+	}
+	var wg sync.WaitGroup
+	wg.Add(len(decks[0]))
+	for _, acard := range decks[0] {
+		go func(acard Card) {
+			defer wg.Done()
+			atrick := Trick{}
+			atrick.PlayCard(acard, Spades)
+			buf, err := serializeStruct(&atrick)
+			if err != nil {
+				t.Fatalf("error serializing - %v", err)
+			}
+			newTrick := new(Trick)
+			err = deserializeStruct(newTrick, buf)
+			if err != nil {
+				t.Fatalf("error deserializing - %v", err)
+			}
+			if !reflect.DeepEqual(&atrick, newTrick) {
+				t.Fatalf("Expected %s, got %s", atrick, newTrick)
+			}
+			for _, bcard := range decks[1] {
+				btrick := atrick
+				btrick.PlayCard(bcard, Spades)
+				buf, err := serializeStruct(&btrick)
+				if err != nil {
+					t.Fatalf("error serializing - %v", err)
+				}
+				newTrick := new(Trick)
+				err = deserializeStruct(newTrick, buf)
+				if err != nil {
+					t.Fatalf("error deserializing - %v", err)
+				}
+				if !reflect.DeepEqual(&btrick, newTrick) {
+					t.Fatalf("Expected %s, got %s", btrick, newTrick)
+				}
+				for _, ccard := range decks[2] {
+					ctrick := btrick
+					ctrick.PlayCard(ccard, Spades)
+					buf, err := serializeStruct(&ctrick)
+					if err != nil {
+						t.Fatalf("error serializing - %v", err)
+					}
+					newTrick := new(Trick)
+					err = deserializeStruct(newTrick, buf)
+					if err != nil {
+						t.Fatalf("error deserializing - %v", err)
+					}
+					if !reflect.DeepEqual(&ctrick, newTrick) {
+						t.Fatalf("Expected %s, got %s", ctrick, newTrick)
+					}
+					for _, dcard := range decks[3] {
+						dtrick := ctrick
+						dtrick.PlayCard(dcard, Spades)
+						buf, err := serializeStruct(&dtrick)
+						if err != nil {
+							t.Fatalf("error serializing - %v", err)
+						}
+						newTrick := new(Trick)
+						err = deserializeStruct(newTrick, buf)
+						if err != nil {
+							t.Fatalf("error deserializing - %v", err)
+						}
+						if !reflect.DeepEqual(&dtrick, newTrick) {
+							t.Fatalf("Expected %s, got %s", dtrick, newTrick)
+						}
+					}
+				}
+			}
+		}(acard)
+	}
+	wg.Wait()
 }

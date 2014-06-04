@@ -77,6 +77,18 @@ func FromContext(c appengine.Context) *Goon {
 	}
 }
 
+func logError(err error) {
+	if !LogErrors {
+		return
+	}
+	_, filename, line, ok := runtime.Caller(1)
+	if ok {
+		fmt.Printf("goon - %s:%d - %v\n", filepath.Base(filename), line, err)
+	} else {
+		fmt.Printf("goon - %v\n", err)
+	}
+}
+
 func (g *Goon) error(err error) {
 	if !LogErrors {
 		return
