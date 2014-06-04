@@ -432,6 +432,7 @@ func serializeStructInternal(enc *gob.Encoder, smd *structMetaData, fms []fieldM
 						for j := 0; j < vfLen; j++ {
 							vi := vf.Index(j)
 							if err := serializeStructInternal(enc, smd, subFms, subPrefix, vi); err != nil {
+								logError(err)
 								return err
 							}
 						}
@@ -461,6 +462,7 @@ func serializeStructInternal(enc *gob.Encoder, smd *structMetaData, fms []fieldM
 								metaData = fieldName
 							}
 							if err := serializeStructInternalEncode(enc, smd, fieldName, metaData, encodeValue, vi); err != nil {
+								logError(err)
 								return err
 							}
 						}
@@ -533,6 +535,7 @@ func serializeStructInternal(enc *gob.Encoder, smd *structMetaData, fms []fieldM
 		} else if vf.Kind() == reflect.Struct {
 			if vfType := vf.Type(); vfType != timeType {
 				if err := serializeStructInternal(enc, smd, getFieldMetadata(vfType), fieldName+".", vf); err != nil {
+					logError(err)
 					return err
 				}
 				continue
@@ -554,6 +557,7 @@ func serializeStructInternal(enc *gob.Encoder, smd *structMetaData, fms []fieldM
 		}
 
 		if err := serializeStructInternalEncode(enc, smd, fieldName, metaData, encodeValue, vf); err != nil {
+			logError(err)
 			return err
 		}
 	}
@@ -611,10 +615,13 @@ func deserializeStruct(dst interface{}, b []byte) error {
 
 		fi, ok := fieldMap[fieldName]
 		if !ok {
-			return fmt.Errorf("goon: Could not find field %v", fieldName)
+			err := fmt.Errorf("goon: Could not find field %v", fieldName)
+			logError(err)
+			return err
 		}
 
 		if err := deserializeStructInternal(sd.dec, fi, fieldName, nameParts, slice, zeroValue, structHistory, v, t); err != nil {
+			logError(err)
 			return err
 		}
 	}
@@ -662,21 +669,27 @@ func deserializeStructInternal(dec *gob.Decoder, fi *fieldInfo, fieldName string
 		if elemType.Kind() == reflect.Uint8 {
 			if !zeroValue {
 				if err := dec.DecodeValue(vf); err != nil {
-					return fmt.Errorf("goon: Failed to decode field %v - %v", fieldName, err)
+					err = fmt.Errorf("goon: Failed to decode field %v - %v", fieldName, err)
+					logError(err)
+					return err
 				}
 			}
 		} else {
 			ev := reflect.New(elemType).Elem()
 			if !zeroValue {
 				if err := dec.DecodeValue(ev); err != nil {
-					return fmt.Errorf("goon: Failed to decode field %v - %v", fieldName, err)
+					err = fmt.Errorf("goon: Failed to decode field %v - %v", fieldName, err)
+					logError(err)
+					return err
 				}
 			}
 			vf.Set(reflect.Append(vf, ev))
 		}
 	} else if !zeroValue {
 		if err := dec.DecodeValue(vf); err != nil {
-			return fmt.Errorf("goon: Failed to decode field %v - %v", fieldName, err)
+			err = fmt.Errorf("goon: Failed to decode field %v - %v", fieldName, err)
+			logError(err)
+			return err
 		}
 	}
 
@@ -724,6 +737,16 @@ func (g *Goon) getStructKey(src interface{}) (key *datastore.Key, hasStringId bo
 					}
 					stringID = vf.String()
 					hasStringId = true
+				case reflect.TypeOf(&datastore.Key{}).Kind():
+					if stringID != "" || intID != 0 {
+						err = fmt.Errorf("goon: Only one field may be marked id")
+						return
+					}
+					key = vf.Interface().(*datastore.Key)
+					if key != nil {
+						setStructKey(src, key)
+						return
+					}
 				default:
 					err = fmt.Errorf("goon: ID field must be int64 or string in %v", t.Name())
 					return
@@ -806,11 +829,13 @@ func setStructKey(src interface{}, key *datastore.Key) error {
 				switch vf.Kind() {
 				case reflect.Int64:
 					vf.SetInt(key.IntID())
-					idSet = true
 				case reflect.String:
 					vf.SetString(key.StringID())
-					idSet = true
+				case reflect.TypeOf(&datastore.Key{}).Kind():
+					vf.Set(reflect.ValueOf(key))
+
 				}
+				idSet = true
 			} else if tagValue == "kind" {
 				if kindSet {
 					return fmt.Errorf("goon: Only one field may be marked kind")

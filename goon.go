@@ -20,7 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -59,6 +61,11 @@ type Goon struct {
 	toDelete      map[string]bool
 }
 
+// Returns the internal appengine.Context in use
+func (g *Goon) C() appengine.Context {
+	return g.context
+}
+
 func memkey(k *datastore.Key) string {
 	// Versioning, so that incompatible changes to the cache system won't cause problems
 	return "g2:" + k.Encode()
@@ -77,11 +84,28 @@ func FromContext(c appengine.Context) *Goon {
 	}
 }
 
+func logError(err error) {
+	if !LogErrors {
+		return
+	}
+	_, filename, line, ok := runtime.Caller(1)
+	if ok {
+		fmt.Printf("goon - %s:%d - %v\n", filepath.Base(filename), line, err)
+	} else {
+		fmt.Printf("goon - %v\n", err)
+	}
+}
+
 func (g *Goon) error(err error) {
 	if !LogErrors {
 		return
 	}
-	g.context.Errorf("goon: %v", err)
+	_, filename, line, ok := runtime.Caller(1)
+	if ok {
+		g.context.Errorf("goon - %s:%d - %v", filepath.Base(filename), line, err)
+	} else {
+		g.context.Errorf("goon - %v", err)
+	}
 }
 
 func (g *Goon) timeoutError(err error) {
@@ -159,7 +183,7 @@ func (g *Goon) RunInTransaction(f func(tg *Goon) error, opts *datastore.Transact
 		g.cacheLock.Lock()
 		defer g.cacheLock.Unlock()
 		for k, v := range ng.toSet {
-			g.cache[k] = v
+			g.putMemoryKey(k, v)
 		}
 
 		for k := range ng.toDelete {
@@ -271,11 +295,22 @@ func (g *Goon) putMemoryMulti(src interface{}, exists []byte) {
 	}
 }
 
+// cache is already locked
+func (g *Goon) putMemoryKey(key string, src interface{}) {
+	if reflect.ValueOf(src).Kind() == reflect.Ptr { // since it's *struct, store a copy instead
+		n := reflect.New(reflect.ValueOf(src).Elem().Type())
+		n.Elem().Set(reflect.ValueOf(src).Elem())
+		g.cache[key] = n.Interface()
+	} else {
+		g.cache[key] = src
+	}
+}
+
 func (g *Goon) putMemory(src interface{}) {
 	key, _, _ := g.getStructKey(src)
 	g.cacheLock.Lock()
 	defer g.cacheLock.Unlock()
-	g.cache[memkey(key)] = src
+	g.putMemoryKey(memkey(key), src)
 }
 
 // FlushLocalCache clears the local memory cache.
@@ -391,7 +426,6 @@ func (g *Goon) GetMulti(dst interface{}) error {
 			if vi.Kind() == reflect.Interface {
 				vi = vi.Elem()
 			}
-
 			reflect.Indirect(vi).Set(reflect.Indirect(reflect.ValueOf(s)))
 		} else {
 			memkeys = append(memkeys, m)
